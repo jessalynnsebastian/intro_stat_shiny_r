@@ -4,7 +4,7 @@ library(shiny)
 # Preload all CSVs from app/data into a list
 # =========================================
 
-data_files <- list.files("data", pattern = "\\.csv$", full.names = TRUE)
+data_files <- list.files("app/data", pattern = "\\.csv$", full.names = TRUE)
 
 data_list <- list()
 if (length(data_files) > 0) {
