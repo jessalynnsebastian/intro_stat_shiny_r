@@ -125,6 +125,97 @@ Creates a scatterplot of y versus x from a data frame.
 
 Example:
   plot(height ~ weight, data = survey)
+",
+  boxplot = "
+boxplot(x ~ group, data = ...)
+
+Creates a boxplot to compare distributions.
+- x: numeric variable (the data to visualize)
+- group: categorical variable (grouping factor, optional)
+- data: data frame
+
+Example:
+  boxplot(height ~ gender, data = survey)  # Side-by-side
+  boxplot(survey$height)                   # Single boxplot
+",
+  barplot = "
+barplot(table(x))
+
+Creates a bar chart for categorical data.
+- x: categorical variable or a table of frequencies
+
+Example:
+  barplot(table(survey$gender))
+",
+  pie = "
+pie(x, labels = names(x))
+
+Creates a pie chart for categorical data.
+- x: a vector of frequencies/counts (often from table())
+- labels: category names
+
+Example:
+  pie(table(survey$gender))
+",
+  mean = "
+mean(x, na.rm = FALSE)
+
+Calculates the arithmetic mean (average) of a numeric vector.
+- x: numeric vector
+- na.rm: if TRUE, removes missing values before computing
+
+Example:
+  mean(survey$height)
+",
+  sd = "
+sd(x, na.rm = FALSE)
+
+Calculates the standard deviation of a numeric vector.
+- x: numeric vector
+- na.rm: if TRUE, removes missing values before computing
+
+Example:
+  sd(survey$height)
+",
+  var = "
+var(x, na.rm = FALSE)
+
+Calculates the variance of a numeric vector.
+- x: numeric vector
+- na.rm: if TRUE, removes missing values before computing
+
+Example:
+  var(survey$height)
+",
+  median = "
+median(x, na.rm = FALSE)
+
+Calculates the median (middle value) of a numeric vector.
+- x: numeric vector
+- na.rm: if TRUE, removes missing values before computing
+
+Example:
+  median(survey$height)
+",
+  summary = "
+summary(x)
+
+Produces a summary of a variable or data frame.
+For numeric: min, Q1, median, mean, Q3, max
+For factors: frequency counts
+
+Example:
+  summary(survey$height)
+  summary(survey)  # Summary of all variables
+",
+  length = "
+length(x)
+
+Returns the number of elements in a vector.
+Useful for sample size (n).
+
+Example:
+  length(survey$height)  # Sample size
 "
 )
 
@@ -166,32 +257,33 @@ ui <- fluidPage(
         tabPanel(
           "Distributions",
           uiOutput("dist_ui")
-        )
+        ),
 
-        # Later you can add:
-        # tabPanel("Statistics", ...)
-      )
+        # ---- Statistics tab: summaries, tests, regression ----
+        tabPanel(
+          "Statistics",
+          uiOutput("stats_ui")
+        )
+      ),
+      hr(),
+      h4("Function help:"),
+      verbatimTextOutput("fun_help")
     ),
 
     mainPanel(
-      h4("R code (you can edit this):"),
+      h4("R code:"),
       textAreaInput(
         "code",
         label = NULL,
-        value = "x <- rnorm(10)\nmean(x)\nsd(x)",
+        value = "# You can type your R code here.\n# Use the helper tabs to insert code snippets.",
         rows = 10,
         width = "100%"
       ),
       br(),
       actionButton("run", "Run code"),
       hr(),
-      h4("Text / numeric output:"),
-      verbatimTextOutput("text_out"),
-      h4("Plot output:"),
-      plotOutput("plot_out", height = "300px"),
-      hr(),
-      h4("Function help:"),
-      verbatimTextOutput("fun_help")
+      h4("Output:"),
+      uiOutput("combined_output")
     )
   )
 )
@@ -291,6 +383,11 @@ server <- function(input, output, session) {
   output$graphics_ui <- renderUI({
     # Dataset choice is optional: "" means "none"
     choices <- c("(none, I'll type my own)" = "", names(data_list))
+    
+    # Also include uploaded dataset if available
+    if (!is.null(uploaded_data())) {
+      choices <- c(choices, "(uploaded)" = "(uploaded)")
+    }
 
     tagList(
       selectInput(
@@ -310,7 +407,7 @@ server <- function(input, output, session) {
             "Number of breaks (bins):",
             value = 10, min = 1, step = 1
           ),
-          actionButton("insert_hist", "Insert hist() code into editor")
+          actionButton("insert_hist", "Insert histogram code into editor")
         ),
 
         # Scatterplot sub-tab
@@ -318,9 +415,106 @@ server <- function(input, output, session) {
           "Scatterplot",
           uiOutput("g_scatter_ui"),
           actionButton("insert_scatter", "Insert scatterplot code into editor")
+        ),
+
+        # Boxplot sub-tab
+        tabPanel(
+          "Boxplot",
+          uiOutput("g_boxplot_ui"),
+          actionButton("insert_boxplot", "Insert boxplot code into editor")
+        ),
+
+        # Barplot sub-tab
+        tabPanel(
+          "Bar Plot",
+          uiOutput("g_barplot_ui"),
+          actionButton("insert_barplot", "Insert barplot code into editor")
+        ),
+
+        # Pie chart sub-tab
+        tabPanel(
+          "Pie Chart",
+          uiOutput("g_piechart_ui"),
+          actionButton("insert_piechart", "Insert pie chart code into editor")
         )
       )
     )
+  })
+
+  # =====================
+  # Statistics tab
+  # =====================
+
+  output$stats_ui <- renderUI({
+    # Dataset choice
+    choices <- c("(none, I'll type my own)" = "", names(data_list))
+    if (!is.null(uploaded_data())) {
+      choices <- c(choices, "(uploaded)" = "(uploaded)")
+    }
+
+    tagList(
+      selectInput(
+        "stats_dataset",
+        "Choose a dataset (optional):",
+        choices = choices
+      ),
+      selectInput(
+        "stats_function",
+        "Choose a function:",
+        choices = c("mean", "sd", "var", "median", "summary", "length")
+      ),
+      uiOutput("stats_var_ui"),
+      actionButton("insert_stats", "Insert code")
+    )
+  })
+
+  # Render variable selector for statistics
+  output$stats_var_ui <- renderUI({
+    if (is.null(input$stats_dataset) || input$stats_dataset == "") {
+      return(helpText(
+        "No dataset selected.",
+        "We'll insert a generic template like: mean(x)"
+      ))
+    }
+
+    dataset_name <- input$stats_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
+
+    numeric_cols <- names(df)[sapply(df, is.numeric)]
+    if (length(numeric_cols) == 0) {
+      return(helpText("No numeric variables found in this dataset."))
+    }
+
+    selectInput(
+      "stats_var",
+      "Choose a numeric variable:",
+      choices = numeric_cols
+    )
+  })
+
+  # Handle insert for statistics
+  observeEvent(input$insert_stats, {
+    func <- input$stats_function
+    
+    if (is.null(input$stats_dataset) || input$stats_dataset == "") {
+      # Generic template
+      line <- sprintf("%s(x)", func)
+    } else {
+      req(input$stats_var)
+      dataset_name <- input$stats_dataset
+      var <- input$stats_var
+      line <- sprintf("%s(%s$%s)", func, dataset_name, var)
+    }
+    
+    old_code <- input$code
+    if (is.null(old_code)) old_code <- ""
+    new_code <- if (nzchar(old_code)) paste(old_code, line, sep = "\n") else line
+    updateTextAreaInput(session, "code", value = new_code)
+    current_fun(func)
   })
 
   # =====================
@@ -534,7 +728,12 @@ server <- function(input, output, session) {
       ))
     }
 
-    df <- data_list[[input$g_dataset]]
+    dataset_name <- input$g_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
 
     numeric_cols <- names(df)[sapply(df, is.numeric)]
     if (length(numeric_cols) == 0) {
@@ -545,6 +744,106 @@ server <- function(input, output, session) {
       "g_hist_var",
       "Choose a numeric variable for the histogram:",
       choices = numeric_cols
+    )
+  })
+
+  # ---- Boxplot variable selector ----
+  output$g_boxplot_ui <- renderUI({
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      return(helpText(
+        "No dataset selected.",
+        "We'll insert a generic template like:",
+        "  boxplot(x ~ group)"
+      ))
+    }
+
+    dataset_name <- input$g_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
+
+    numeric_cols <- names(df)[sapply(df, is.numeric)]
+    other_cols <- names(df)[!sapply(df, is.numeric)]
+
+    if (length(numeric_cols) == 0) {
+      return(helpText("No numeric variables found in this dataset."))
+    }
+
+    tagList(
+      selectInput(
+        "g_boxplot_var",
+        "Choose a numeric variable:",
+        choices = numeric_cols
+      ),
+      if (length(other_cols) > 0) {
+        selectInput(
+          "g_boxplot_group",
+          "Group by (optional, for side-by-side boxplots):",
+          choices = c("(none)" = "", other_cols)
+        )
+      }
+    )
+  })
+
+  # ---- Barplot variable selector ----
+  output$g_barplot_ui <- renderUI({
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      return(helpText(
+        "No dataset selected.",
+        "We'll insert a generic template like:",
+        "  barplot(table(x))"
+      ))
+    }
+
+    dataset_name <- input$g_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
+
+    cat_cols <- names(df)[!sapply(df, is.numeric)]
+
+    if (length(cat_cols) == 0) {
+      return(helpText("No categorical variables found in this dataset."))
+    }
+
+    selectInput(
+      "g_barplot_var",
+      "Choose a categorical variable:",
+      choices = cat_cols
+    )
+  })
+
+  # ---- Pie chart variable selector ----
+  output$g_piechart_ui <- renderUI({
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      return(helpText(
+        "No dataset selected.",
+        "We'll insert a generic template like:",
+        "  pie(table(x))"
+      ))
+    }
+
+    dataset_name <- input$g_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
+
+    cat_cols <- names(df)[!sapply(df, is.numeric)]
+
+    if (length(cat_cols) == 0) {
+      return(helpText("No categorical variables found in this dataset."))
+    }
+
+    selectInput(
+      "g_piechart_var",
+      "Choose a categorical variable:",
+      choices = cat_cols
     )
   })
 
@@ -560,7 +859,12 @@ server <- function(input, output, session) {
       ))
     }
 
-    df <- data_list[[input$g_dataset]]
+    dataset_name <- input$g_dataset
+    if (dataset_name == "(uploaded)") {
+      df <- uploaded_data()
+    } else {
+      df <- data_list[[dataset_name]]
+    }
 
     numeric_cols <- names(df)[sapply(df, is.numeric)]
     if (length(numeric_cols) < 2) {
@@ -640,8 +944,70 @@ server <- function(input, output, session) {
     current_fun("plot")
   })
 
+  # ---- Insert boxplot code ----
+  observeEvent(input$insert_boxplot, {
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      line <- "boxplot(x ~ group)"
+    } else {
+      req(input$g_boxplot_var)
+      dataset_name <- input$g_dataset
+      var <- input$g_boxplot_var
+      group <- input$g_boxplot_group
+      
+      if (is.null(group) || group == "") {
+        # Single boxplot
+        line <- sprintf("boxplot(%s$%s)", dataset_name, var)
+      } else {
+        # Side-by-side boxplots
+        line <- sprintf("boxplot(%s$%s ~ %s$%s)", dataset_name, var, dataset_name, group)
+      }
+    }
+
+    old_code <- input$code
+    if (is.null(old_code)) old_code <- ""
+    new_code <- if (nzchar(old_code)) paste(old_code, line, sep = "\n") else line
+    updateTextAreaInput(session, "code", value = new_code)
+    current_fun("boxplot")
+  })
+
+  # ---- Insert barplot code ----
+  observeEvent(input$insert_barplot, {
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      line <- "barplot(table(x))"
+    } else {
+      req(input$g_barplot_var)
+      dataset_name <- input$g_dataset
+      var <- input$g_barplot_var
+      line <- sprintf("barplot(table(%s$%s))", dataset_name, var)
+    }
+
+    old_code <- input$code
+    if (is.null(old_code)) old_code <- ""
+    new_code <- if (nzchar(old_code)) paste(old_code, line, sep = "\n") else line
+    updateTextAreaInput(session, "code", value = new_code)
+    current_fun("barplot")
+  })
+
+  # ---- Insert pie chart code ----
+  observeEvent(input$insert_piechart, {
+    if (is.null(input$g_dataset) || input$g_dataset == "") {
+      line <- "pie(table(x))"
+    } else {
+      req(input$g_piechart_var)
+      dataset_name <- input$g_dataset
+      var <- input$g_piechart_var
+      line <- sprintf("pie(table(%s$%s))", dataset_name, var)
+    }
+
+    old_code <- input$code
+    if (is.null(old_code)) old_code <- ""
+    new_code <- if (nzchar(old_code)) paste(old_code, line, sep = "\n") else line
+    updateTextAreaInput(session, "code", value = new_code)
+    current_fun("pie")
+  })
+
   # =====================
-  # Run code + outputs
+  # Run code + outputs (combined)
   # =====================
 
   observeEvent(input$run, {
@@ -650,19 +1016,23 @@ server <- function(input, output, session) {
     # ---- Safety check: blocklist dangerous functions ----
     safety_error <- check_code_safety(code_text)
     if (!is.null(safety_error)) {
-      output$text_out <- renderText({ safety_error })
+      output$combined_output <- renderUI({
+        tagList(
+          verbatimTextOutput("error_msg")
+        )
+      })
+      output$error_msg <- renderText({ safety_error })
       return(NULL)
     }
-
-    # Clear previous outputs
-    output$text_out  <- renderText({ "" })
-    output$plot_out  <- renderPlot({ })
 
     # Parse into multiple expressions
     exprs <- try(parse(text = code_text), silent = TRUE)
 
     if (inherits(exprs, "try-error")) {
-      output$text_out <- renderText({
+      output$combined_output <- renderUI({
+        verbatimTextOutput("error_msg")
+      })
+      output$error_msg <- renderText({
         paste("Parse error:\n", attr(exprs, "condition")$message)
       })
       return(NULL)
@@ -672,12 +1042,15 @@ server <- function(input, output, session) {
     all_out <- character()
 
     for (expr in exprs) {
+      # Capture text output
       this_out <- try(
         {
-          # Set timeout to 5 seconds per expression
           setTimeLimit(elapsed = 5, transient = TRUE)
-          res <- withVisible(eval(expr, envir = user_env))
-          capture.output(if (res$visible) print(res$value))
+          captured <- capture.output({
+            res <- withVisible(eval(expr, envir = user_env))
+            if (res$visible) print(res$value)
+          })
+          captured
         },
         silent = TRUE
       )
@@ -693,18 +1066,27 @@ server <- function(input, output, session) {
       }
     }
 
-    if (length(all_out) == 0) {
-      all_out <- "[No printed output.]"
-    }
-
-    output$text_out <- renderText({
-      paste(all_out, collapse = "\n")
-    })
-
-    # Re-run code in a plotting context: any plotting calls will draw here
-    output$plot_out <- renderPlot({
-      setTimeLimit(elapsed = 5, transient = TRUE)
-      eval(parse(text = code_text), envir = user_env)
+    # Build combined output - always show both text and plot areas
+    output$combined_output <- renderUI({
+      # Set up text output
+      output$text_result <- renderText({
+        if (length(all_out) > 0) {
+          paste(all_out, collapse = "\n")
+        } else {
+          ""
+        }
+      })
+      
+      # Set up plot output (will only display if plot is created)
+      output$plot_result <- renderPlot({
+        setTimeLimit(elapsed = 5, transient = TRUE)
+        eval(parse(text = code_text), envir = user_env)
+      }, height = 400)
+      
+      tagList(
+        verbatimTextOutput("text_result"),
+        plotOutput("plot_result")
+      )
     })
   })
 
