@@ -305,6 +305,7 @@ server <- function(input, output, session) {
   
   # Reactive value to store uploaded dataset
   uploaded_data <- reactiveVal(NULL)
+  uploaded_name <- reactiveVal(NULL)
 
   # =====================
   # Data tab
@@ -314,7 +315,13 @@ server <- function(input, output, session) {
     preloaded_choices <- if (length(data_list) > 0) names(data_list) else c()
     
     # Add uploaded dataset to choices if available
-    all_choices <- c(preloaded_choices, if (!is.null(uploaded_data())) "(uploaded)" else c())
+    uploaded_choice <- if (!is.null(uploaded_data())) {
+      name <- uploaded_name()
+      if (!is.null(name)) name else "uploaded"
+    } else {
+      c()
+    }
+    all_choices <- c(preloaded_choices, uploaded_choice)
 
     tagList(
       h5("Upload a CSV file:"),
@@ -340,13 +347,18 @@ server <- function(input, output, session) {
   # Handle file upload
   observeEvent(input$upload_file, {
     file_path <- input$upload_file$datapath
+    file_name <- input$upload_file$name
     if (!is.null(file_path)) {
       tryCatch(
         {
           df <- read.csv(file_path)
           uploaded_data(df)
+          # Get clean variable name from filename (remove .csv, replace invalid chars)
+          clean_name <- gsub("\\.csv$", "", basename(file_name))
+          clean_name <- gsub("[^a-zA-Z0-9_]", "_", clean_name)
+          uploaded_name(clean_name)
           # Assign to user environment for code execution
-          assign("uploaded", df, envir = user_env)
+          assign(clean_name, df, envir = user_env)
         },
         error = function(e) {
           showNotification(
@@ -364,7 +376,7 @@ server <- function(input, output, session) {
     dataset_choice <- input$dataset_name
     
     if (!is.null(dataset_choice)) {
-      if (dataset_choice == "(uploaded)") {
+      if (dataset_choice == uploaded_name()) {
         df <- uploaded_data()
       } else {
         df <- data_list[[dataset_choice]]
@@ -386,7 +398,10 @@ server <- function(input, output, session) {
     
     # Also include uploaded dataset if available
     if (!is.null(uploaded_data())) {
-      choices <- c(choices, "(uploaded)" = "(uploaded)")
+      uname <- uploaded_name()
+      if (!is.null(uname)) {
+        choices <- c(choices, setNames(uname, uname))
+      }
     }
 
     tagList(
@@ -449,7 +464,10 @@ server <- function(input, output, session) {
     # Dataset choice
     choices <- c("(none, I'll type my own)" = "", names(data_list))
     if (!is.null(uploaded_data())) {
-      choices <- c(choices, "(uploaded)" = "(uploaded)")
+      uname <- uploaded_name()
+      if (!is.null(uname)) {
+        choices <- c(choices, setNames(uname, uname))
+      }
     }
 
     tagList(
@@ -478,7 +496,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$stats_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -729,7 +747,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -758,7 +776,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -798,7 +816,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -828,7 +846,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -860,7 +878,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == "(uploaded)") {
+    if (dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
