@@ -1,26 +1,81 @@
 library(shiny)
 
 # =========================================
-# Preload all CSVs from URLs into a list
+# Preload CSV data (embedded as strings)
 # =========================================
 
-# ---- Define data sources by URL ----
-data_sources <- list(
-  plantgrowth = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/plantgrowth.csv",
-  cherrytrees = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/cherrytrees.csv"
-  # add more here at some point
-)
+# ---- Plant Growth Data ----
+plantgrowth_csv <- "\"weight\",\"group\"
+4.17,\"ctrl\"
+5.58,\"ctrl\"
+5.18,\"ctrl\"
+6.11,\"ctrl\"
+4.5,\"ctrl\"
+4.61,\"ctrl\"
+5.17,\"ctrl\"
+4.53,\"ctrl\"
+5.33,\"ctrl\"
+5.14,\"ctrl\"
+4.81,\"trt1\"
+4.17,\"trt1\"
+4.41,\"trt1\"
+3.59,\"trt1\"
+5.87,\"trt1\"
+3.83,\"trt1\"
+6.03,\"trt1\"
+4.89,\"trt1\"
+4.32,\"trt1\"
+4.69,\"trt1\"
+6.31,\"trt2\"
+5.12,\"trt2\"
+5.54,\"trt2\"
+5.5,\"trt2\"
+5.37,\"trt2\"
+5.29,\"trt2\"
+4.92,\"trt2\"
+6.15,\"trt2\"
+5.8,\"trt2\"
+5.26,\"trt2\""
 
-# ---- Download + read them into the webR filesystem ----
-data_list <- list()
-if (length(data_sources) > 0) {
-  for (nm in names(data_sources)) {
-    url <- data_sources[[nm]]
-    local_name <- paste0(nm, ".csv")
-    download.file(url, local_name, quiet = TRUE)
-    data_list[[nm]] <- read.csv(local_name)
-  }
-}
+# ---- Cherry Trees Data ----
+cherrytrees_csv <- "\"Girth\",\"Height\",\"Volume\"
+8.3,70,10.3
+8.6,65,10.3
+8.8,63,10.2
+10.5,72,16.4
+10.7,81,18.8
+10.8,83,19.7
+11,66,15.6
+11,75,18.2
+11.1,80,22.6
+11.2,75,19.9
+11.3,79,24.2
+11.4,76,21
+11.4,76,21.4
+11.7,69,21.3
+12,75,19.1
+12.9,74,22.2
+12.9,85,33.8
+13.3,86,27.4
+13.7,71,25.7
+13.8,64,24.9
+14,78,34.5
+14.2,80,31.7
+14.5,74,36.3
+16,72,38.3
+16.3,77,42.6
+17.3,81,55.4
+17.5,82,55.7
+17.9,80,58.3
+18,80,51.5
+18,80,51
+20.6,87,77"
+
+# ---- Load data into list ----
+data_list <- list(
+  plantgrowth = read.csv(text = plantgrowth_csv),
+  cherrytrees = read.csv(text = cherrytrees_csv)
+)
 
 # =========================================
 # Safety: Blocklist dangerous functions
