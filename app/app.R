@@ -6,9 +6,9 @@ library(shiny)
 
 # ---- Define data sources by URL ----
 data_sources <- list(
-  ex1 = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/ex1.csv",
-  ex2 = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/ex2.csv"
-  # add more here
+  plantgrowth = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/plantgrowth.csv",
+  cherrytrees = "https://raw.githubusercontent.com/jessalynnsebastian/intro_stat_shiny_r/main/app/data/cherrytrees.csv"
+  # add more here at some point
 )
 
 # ---- Download + read them into the webR filesystem ----
