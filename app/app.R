@@ -431,7 +431,7 @@ server <- function(input, output, session) {
     dataset_choice <- input$dataset_name
     
     if (!is.null(dataset_choice)) {
-      if (dataset_choice == uploaded_name()) {
+      if (!is.null(uploaded_name()) && dataset_choice == uploaded_name()) {
         df <- uploaded_data()
       } else {
         df <- data_list[[dataset_choice]]
@@ -551,7 +551,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$stats_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -802,7 +802,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -831,7 +831,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -871,7 +871,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -901,7 +901,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
@@ -933,7 +933,7 @@ server <- function(input, output, session) {
     }
 
     dataset_name <- input$g_dataset
-    if (dataset_name == uploaded_name()) {
+    if (!is.null(uploaded_name()) && dataset_name == uploaded_name()) {
       df <- uploaded_data()
     } else {
       df <- data_list[[dataset_name]]
