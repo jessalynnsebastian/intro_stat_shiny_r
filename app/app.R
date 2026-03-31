@@ -1,5 +1,8 @@
 library(shiny)
 
+# Allow larger classroom datasets than Shiny's default 5 MB upload limit.
+options(shiny.maxRequestSize = 25 * 1024^2)
+
 # =========================================
 # Preload CSV data (embedded as strings)
 # =========================================
@@ -296,7 +299,15 @@ ui <- fluidPage(
         # ---- Data tab: choose dataset and see preview ----
         tabPanel(
           "Data",
-          uiOutput("data_ui"),
+          h5("Upload a CSV file:"),
+          fileInput(
+            "upload_file",
+            "Choose CSV file:",
+            accept = c(".csv", "text/csv")
+          ),
+          hr(),
+          h5("Or select a dataset:"),
+          uiOutput("dataset_picker_ui"),
           br(),
           h5("Preview of selected dataset:"),
           tableOutput("data_preview")
@@ -366,7 +377,7 @@ server <- function(input, output, session) {
   # Data tab
   # =====================
 
-  output$data_ui <- renderUI({
+  output$dataset_picker_ui <- renderUI({
     preloaded_choices <- if (length(data_list) > 0) names(data_list) else c()
     
     # Add uploaded dataset to choices if available
@@ -378,52 +389,64 @@ server <- function(input, output, session) {
     }
     all_choices <- c(preloaded_choices, uploaded_choice)
 
-    tagList(
-      h5("Upload a CSV file:"),
-      fileInput(
-        "upload_file",
-        "Choose CSV file:",
-        accept = c(".csv", "text/csv")
-      ),
-      hr(),
-      h5("Or select a preloaded dataset:"),
-      if (length(all_choices) > 0) {
-        selectInput(
-          "dataset_name",
-          "Select dataset to preview:",
-          choices = all_choices
-        )
-      } else {
-        helpText("No datasets available. Upload a CSV file to get started.")
-      }
-    )
+    if (length(all_choices) > 0) {
+      selectInput(
+        "dataset_name",
+        "Select dataset to preview:",
+        choices = all_choices
+      )
+    } else {
+      helpText("No datasets available. Upload a CSV file to get started.")
+    }
   })
 
   # Handle file upload
   observeEvent(input$upload_file, {
-    file_path <- input$upload_file$datapath
-    file_name <- input$upload_file$name
-    if (!is.null(file_path)) {
-      tryCatch(
-        {
-          df <- read.csv(file_path)
-          uploaded_data(df)
-          # Get clean variable name from filename (remove .csv, replace invalid chars)
-          clean_name <- gsub("\\.csv$", "", basename(file_name))
-          clean_name <- gsub("[^a-zA-Z0-9_]", "_", clean_name)
-          uploaded_name(clean_name)
-          # Assign to user environment for code execution
-          assign(clean_name, df, envir = user_env)
-        },
-        error = function(e) {
-          showNotification(
-            paste("Error reading file:", e$message),
-            type = "error",
-            duration = 5
-          )
-        }
-      )
+    req(input$upload_file)
+
+    file_path <- input$upload_file$datapath[[1]]
+    file_name <- input$upload_file$name[[1]]
+
+    if (is.null(file_path) || !nzchar(file_path)) {
+      return(NULL)
     }
+
+    tryCatch(
+      {
+        df <- read.csv(
+          file_path,
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        )
+
+        uploaded_data(df)
+
+        # Get clean variable name from filename (remove .csv, replace invalid chars)
+        clean_name <- gsub("\\.[cC][sS][vV]$", "", basename(file_name))
+        clean_name <- gsub("[^a-zA-Z0-9_]", "_", clean_name)
+
+        if (!nzchar(clean_name)) clean_name <- "uploaded_data"
+        if (grepl("^[0-9]", clean_name)) clean_name <- paste0("data_", clean_name)
+
+        uploaded_name(clean_name)
+
+        # Assign to user environment for code execution
+        assign(clean_name, df, envir = user_env)
+
+        showNotification(
+          paste("Uploaded", file_name, "as", clean_name),
+          type = "message",
+          duration = 3
+        )
+      },
+      error = function(e) {
+        showNotification(
+          paste("Error reading file:", e$message),
+          type = "error",
+          duration = 5
+        )
+      }
+    )
   })
 
   output$data_preview <- renderTable({
