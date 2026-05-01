@@ -1041,14 +1041,37 @@ server <- function(input, output, session) {
     # Branch on whether a dataset is selected
     if (is.null(input$g_dataset) || input$g_dataset == "") {
       # Generic template: student supplies x
-      line <- sprintf("hist(x, breaks = %s)", input$g_breaks)
+      line <- paste(
+        "x_clean <- x[is.finite(x)]",
+        "x_mean <- mean(x_clean, na.rm = TRUE)",
+        "x_sd <- sd(x_clean, na.rm = TRUE)",
+        sprintf(
+          "hist(x_clean, breaks = %s, probability = TRUE, col = 'gray85', border = 'white',",
+          input$g_breaks
+        ),
+        "     main = sprintf('Histogram + KDE (mean = %.2f, sd = %.2f)', x_mean, x_sd),",
+        "     xlab = 'x')",
+        "if (length(x_clean) > 1) lines(density(x_clean, na.rm = TRUE), col = 'steelblue', lwd = 2)",
+        sep = "\n"
+      )
     } else {
       req(input$g_hist_var, input$g_breaks)
       dataset_name <- input$g_dataset
       hist_var <- safe_col(input$g_hist_var)
       line <- sprintf(
-        "hist(%s$%s, breaks = %s)",
-        dataset_name, hist_var, input$g_breaks
+        paste(
+          "x_clean <- %s$%s[is.finite(%s$%s)]",
+          "x_mean <- mean(x_clean, na.rm = TRUE)",
+          "x_sd <- sd(x_clean, na.rm = TRUE)",
+          "hist(x_clean, breaks = %s, probability = TRUE, col = 'gray85', border = 'white',",
+          "     main = sprintf('Histogram + KDE (mean = %%.2f, sd = %%.2f)', x_mean, x_sd),",
+          "     xlab = '%s')",
+          "if (length(x_clean) > 1) lines(density(x_clean, na.rm = TRUE), col = 'steelblue', lwd = 2)",
+          sep = "\n"
+        ),
+        dataset_name, hist_var, dataset_name, hist_var,
+        input$g_breaks,
+        input$g_hist_var
       )
     }
 
