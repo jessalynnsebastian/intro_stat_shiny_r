@@ -336,7 +336,7 @@ ui <- fluidPage(
           ),
           
           numericInput("clt_n", "Sample size (n):", value = 30, min = 1),
-          numericInput("clt_reps", "Number of repetitions:", value = 1000, min = 1),
+          numericInput("clt_reps", "Number of repetitions:", value = 10000, min = 1),
           
           # Parameters for Normal
           conditionalPanel(
