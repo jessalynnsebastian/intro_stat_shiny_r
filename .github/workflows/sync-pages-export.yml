@@ -1,0 +1,43 @@
+name: Sync GitHub Pages Export
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app/**
+      - .github/workflows/sync-pages-export.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export-shinylive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install shinylive
+        run: Rscript -e "install.packages('shinylive', repos = 'https://cloud.r-project.org')"
+
+      - name: Rebuild docs export
+        run: Rscript -e "shinylive::export('app', 'docs')"
+
+      - name: Commit exported docs
+        run: |
+          if git diff --quiet -- docs; then
+            echo "No docs changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git commit -m "Sync docs export from app source"
+          git push
