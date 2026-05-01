@@ -325,6 +325,52 @@ ui <- fluidPage(
           uiOutput("dist_ui")
         ),
 
+        tabPanel(
+          "CLT",
+          h5("Central Limit Theorem simulator"),
+          
+          selectInput(
+            "clt_dist",
+            "Choose a distribution:",
+            choices = c("Normal", "Uniform", "Bernoulli", "Custom pdf")
+          ),
+          
+          numericInput("clt_n", "Sample size (n):", value = 30, min = 1),
+          numericInput("clt_reps", "Number of repetitions:", value = 1000, min = 1),
+          
+          # Parameters for Normal
+          conditionalPanel(
+            condition = "input.clt_dist == 'Normal'",
+            numericInput("clt_mean", "Mean:", value = 0),
+            numericInput("clt_sd", "SD:", value = 1, min = 0.01)
+          ),
+          
+          # Parameters for Uniform
+          conditionalPanel(
+            condition = "input.clt_dist == 'Uniform'",
+            numericInput("clt_min", "Min:", value = 0),
+            numericInput("clt_max", "Max:", value = 1)
+          ),
+
+          # Parameters for Bernoulli
+          conditionalPanel(
+            condition = "input.clt_dist == 'Bernoulli'",
+            numericInput("clt_p", "Probability of success (p):", value = 0.5, min = 0, max = 1)
+          ),
+
+          # Parameters for a custom pdf
+          conditionalPanel(
+            condition = "input.clt_dist == 'Custom pdf'",
+            textInput("clt_pdf_expr", "Custom density f(x):", value = "dbeta(x, shape1 = 2, shape2 = 2)"),
+            numericInput("clt_pdf_min", "Support min:", value = 0),
+            numericInput("clt_pdf_max", "Support max:", value = 1),
+            numericInput("clt_pdf_m", "Envelope height M:", value = 1.5, min = 0.01)
+            ,helpText("Choose M so the density stays at or below M on the support interval. This is the rejection-sampling envelope height.")
+          ),
+          
+          actionButton("insert_clt", "Insert CLT simulation code")
+        ),
+
         # ---- Statistics tab: summaries, tests, regression ----
         tabPanel(
           "Statistics",
@@ -372,6 +418,14 @@ server <- function(input, output, session) {
   # Reactive value to store uploaded dataset
   uploaded_data <- reactiveVal(NULL)
   uploaded_name <- reactiveVal(NULL)
+
+  # Quote non-syntactic column names so generated code stays valid.
+  safe_col <- function(col_name) {
+    if (identical(col_name, make.names(col_name)) && !grepl("^\\.[0-9]", col_name)) {
+      return(col_name)
+    }
+    paste0("`", gsub("`", "\\\\`", col_name), "`")
+  }
 
   # =====================
   # Data tab
@@ -602,7 +656,7 @@ server <- function(input, output, session) {
     } else {
       req(input$stats_var)
       dataset_name <- input$stats_dataset
-      var <- input$stats_var
+      var <- safe_col(input$stats_var)
       line <- sprintf("%s(%s$%s)", func, dataset_name, var)
     }
     
@@ -991,9 +1045,10 @@ server <- function(input, output, session) {
     } else {
       req(input$g_hist_var, input$g_breaks)
       dataset_name <- input$g_dataset
+      hist_var <- safe_col(input$g_hist_var)
       line <- sprintf(
         "hist(%s$%s, breaks = %s)",
-        dataset_name, input$g_hist_var, input$g_breaks
+        dataset_name, hist_var, input$g_breaks
       )
     }
 
@@ -1019,10 +1074,12 @@ server <- function(input, output, session) {
     } else {
       req(input$g_scatter_x, input$g_scatter_y)
       dataset_name <- input$g_dataset
+      x_var <- safe_col(input$g_scatter_x)
+      y_var <- safe_col(input$g_scatter_y)
       line <- sprintf(
         "plot(%s ~ %s, data = %s)",
-        input$g_scatter_y,
-        input$g_scatter_x,
+        y_var,
+        x_var,
         dataset_name
       )
     }
@@ -1047,7 +1104,7 @@ server <- function(input, output, session) {
     } else {
       req(input$g_boxplot_var)
       dataset_name <- input$g_dataset
-      var <- input$g_boxplot_var
+      var <- safe_col(input$g_boxplot_var)
       group <- input$g_boxplot_group
       
       if (is.null(group) || group == "") {
@@ -1055,7 +1112,8 @@ server <- function(input, output, session) {
         line <- sprintf("boxplot(%s$%s)", dataset_name, var)
       } else {
         # Side-by-side boxplots
-        line <- sprintf("boxplot(%s$%s ~ %s$%s)", dataset_name, var, dataset_name, group)
+        group_safe <- safe_col(group)
+        line <- sprintf("boxplot(%s$%s ~ %s$%s)", dataset_name, var, dataset_name, group_safe)
       }
     }
 
@@ -1073,7 +1131,7 @@ server <- function(input, output, session) {
     } else {
       req(input$g_barplot_var)
       dataset_name <- input$g_dataset
-      var <- input$g_barplot_var
+      var <- safe_col(input$g_barplot_var)
       line <- sprintf("barplot(table(%s$%s))", dataset_name, var)
     }
 
@@ -1091,7 +1149,7 @@ server <- function(input, output, session) {
     } else {
       req(input$g_piechart_var)
       dataset_name <- input$g_dataset
-      var <- input$g_piechart_var
+      var <- safe_col(input$g_piechart_var)
       line <- sprintf("pie(table(%s$%s))", dataset_name, var)
     }
 
@@ -1100,6 +1158,68 @@ server <- function(input, output, session) {
     new_code <- if (nzchar(old_code)) paste(old_code, line, sep = "\n") else line
     updateTextAreaInput(session, "code", value = new_code)
     current_fun("pie")
+  })
+
+  observeEvent(input$insert_clt, {
+    dist <- input$clt_dist
+    n <- input$clt_n
+    reps <- input$clt_reps
+
+    if (dist == "Normal") {
+      line <- sprintf(
+        "means <- replicate(%s, mean(rnorm(%s, mean = %s, sd = %s)))\nhist(means)",
+        reps, n, input$clt_mean, input$clt_sd
+      )
+    } else if (dist == "Uniform") {
+      line <- sprintf(
+        "means <- replicate(%s, mean(runif(%s, min = %s, max = %s)))\nhist(means)",
+        reps, n, input$clt_min, input$clt_max
+      )
+    } else if (dist == "Bernoulli") {
+      line <- sprintf(
+        "means <- replicate(%s, mean(rbinom(%s, size = 1, prob = %s)))\nhist(means)",
+        reps, n, input$clt_p
+      )
+    } else if (dist == "Custom pdf") {
+      line <- sprintf(
+        paste(
+          "f <- function(x) %s",
+          "sample_custom <- function(n, min = %s, max = %s, M = %s) {",
+          "  out <- numeric(0)",
+          "  while (length(out) < n) {",
+          "    x <- runif(1, min = min, max = max)",
+          "    u <- runif(1, 0, M)",
+          "    if (u <= f(x)) out <- c(out, x)",
+          "  }",
+          "  out",
+          "}",
+          "means <- replicate(%s, mean(sample_custom(%s, min = %s, max = %s, M = %s)))",
+          "hist(means)",
+          sep = "\n"
+        ),
+        input$clt_pdf_expr,
+        input$clt_pdf_min,
+        input$clt_pdf_max,
+        input$clt_pdf_m,
+        reps,
+        n,
+        input$clt_pdf_min,
+        input$clt_pdf_max,
+        input$clt_pdf_m
+      )
+    }
+
+    old_code <- input$code
+    if (is.null(old_code)) old_code <- ""
+
+    new_code <- if (nzchar(old_code)) {
+      paste(old_code, line, sep = "\n")
+    } else {
+      line
+    }
+
+    updateTextAreaInput(session, "code", value = new_code)
+    current_fun("mean")
   })
 
   # =====================
