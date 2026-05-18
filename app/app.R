@@ -274,6 +274,48 @@ Useful for sample size (n).
 
 Example:
   length(survey$height)  # Sample size
+",
+  rexp = "
+rexp(n, rate = 1)
+
+Generates n random draws from an Exponential(rate) distribution.
+- n: number of draws
+- rate: rate parameter (for Exponential(1), rate = 1)
+
+Example:
+  rexp(5, rate = 1)
+",
+  dexp = "
+dexp(x, rate = 1, log = FALSE)
+
+Returns the density f(x) for an Exponential(rate) distribution.
+- x: numeric vector of points
+- rate: rate parameter (for Exponential(1), rate = 1)
+- log: TRUE to return log-density
+
+Example:
+  dexp(1, rate = 1)
+",
+  pexp = "
+pexp(q, rate = 1, lower.tail = TRUE)
+
+Returns P(X <= q) for an Exponential(rate) distribution.
+- q: cutoff value
+- rate: rate parameter (for Exponential(1), rate = 1)
+- lower.tail: FALSE gives P(X > q)
+
+Example:
+  pexp(1, rate = 1)
+",
+  qexp = "
+qexp(p, rate = 1)
+
+Gives the quantile (cutoff) of an Exponential(rate) distribution.
+- p: probability
+- rate: rate parameter (for Exponential(1), rate = 1)
+
+Example:
+  qexp(0.975, rate = 1)
 "
 )
 
@@ -676,7 +718,7 @@ server <- function(input, output, session) {
       selectInput(
         "dist_family",
         "Choose a distribution:",
-        choices = c("Normal", "Student's t", "Binomial", "Uniform")
+        choices = c("Normal", "Student's t", "Binomial", "Uniform", "Exponential")
       ),
       selectInput(
         "dist_type",
@@ -806,6 +848,11 @@ server <- function(input, output, session) {
         ))
       }
     }
+
+    # Exponential distribution (fixed rate = 1)
+    if (family == "Exponential") {
+      return(helpText("This helper uses Exponential(1), so the rate is fixed at 1."))
+    }
   })
 
   # Handle insert for distributions
@@ -855,6 +902,16 @@ server <- function(input, output, session) {
         line <- sprintf("punif(%s, min = %s, max = %s)", input$d_q, input$d_min, input$d_max)
       } else if (dtype == "Quantiles") {
         line <- sprintf("qunif(%s, min = %s, max = %s)", input$d_p, input$d_min, input$d_max)
+      }
+    } else if (family == "Exponential") {
+      if (dtype == "Samples") {
+        line <- sprintf("rexp(%s, rate = 1)", input$d_n)
+      } else if (dtype == "Density/Mass") {
+        line <- sprintf("dexp(%s, rate = 1)", input$d_x)
+      } else if (dtype == "CDF") {
+        line <- sprintf("pexp(%s, rate = 1)", input$d_q)
+      } else if (dtype == "Quantiles") {
+        line <- sprintf("qexp(%s, rate = 1)", input$d_p)
       }
     }
 
