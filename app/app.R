@@ -374,7 +374,7 @@ ui <- fluidPage(
           selectInput(
             "clt_dist",
             "Choose a distribution:",
-            choices = c("Normal", "Uniform", "Bernoulli", "Custom pdf")
+            choices = c("Normal", "Uniform", "Bernoulli", "Exponential", "Custom pdf")
           ),
           
           numericInput("clt_n", "Sample size (n):", value = 30, min = 1),
@@ -398,6 +398,12 @@ ui <- fluidPage(
           conditionalPanel(
             condition = "input.clt_dist == 'Bernoulli'",
             numericInput("clt_p", "Probability of success (p):", value = 0.5, min = 0, max = 1)
+          ),
+
+          # Parameters for Exponential
+          conditionalPanel(
+            condition = "input.clt_dist == 'Exponential'",
+            numericInput("clt_rate", "Rate parameter:", value = 1, min = 0.01, step = 0.1)
           ),
 
           # Parameters for a custom pdf
@@ -1259,6 +1265,11 @@ server <- function(input, output, session) {
       line <- sprintf(
         "means <- replicate(%s, mean(rbinom(%s, size = 1, prob = %s)))\nhist(means)",
         reps, n, input$clt_p
+      )
+    } else if (dist == "Exponential") {
+      line <- sprintf(
+        "means <- replicate(%s, mean(rexp(%s, rate = %s)))\nhist(means)",
+        reps, n, input$clt_rate
       )
     } else if (dist == "Custom pdf") {
       line <- sprintf(
